@@ -109,34 +109,32 @@ async def home(request: Request):
 # yt-dlp配置
 def get_ydl_opts():
     base_opts = {
-        'format': 'best',
+        'format': 'best[protocol^=http]',  # 只使用 HTTP 协议
         'quiet': False,
         'no_warnings': False,
         'extract_info': True,
         'verbose': True,
         'force_generic_extractor': False,
-        'extract_flat': True,
+        'extract_flat': False,  # 关闭扁平提取
         'youtube_include_dash_manifest': False,
         'extractor_args': {
             'youtube': {
-                'skip': ['dash', 'hls']
+                'skip': [],  # 不跳过任何格式
+                'player_skip': []
             }
         },
         'http_headers': {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
-            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+            'Accept': '*/*',
             'Accept-Language': 'en-US,en;q=0.9',
-            'Accept-Encoding': 'gzip, deflate',
             'Origin': 'https://www.youtube.com',
             'Referer': 'https://www.youtube.com/'
         },
-        'socket_timeout': 60,
-        'retries': 10,
-        'ignoreerrors': True,
+        'socket_timeout': 30,
+        'retries': 3,
+        'ignoreerrors': False,  # 不忽略错误以便看到详细信息
         'no_check_certificate': True,
-        'nocheckcertificate': True,
-        'prefer_insecure': True,
-        'geo_bypass': True
+        'nocheckcertificate': True
     }
     
     print(f"当前环境: {'Vercel' if os.environ.get('VERCEL') else '本地'}")
@@ -157,65 +155,44 @@ async def download_video(video_url: str = Form(...)):
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             print("开始获取视频信息...")
             try:
-                # 先尝试获取基本信息
-                print("尝试获取基本信息...")
-                basic_info = ydl.extract_info(video_url, download=False, process=False)
-                print(f"基本信息获取结果: {bool(basic_info)}")
-                if basic_info:
-                    print(f"视频ID: {basic_info.get('id')}")
-                    print(f"提取器: {basic_info.get('extractor')}")
-                
-                # 然后获取完整信息
-                print("尝试获取完整信息...")
+                # 直接获取完整信息
                 info = ydl.extract_info(video_url, download=False)
-                print(f"完整信息获取结果: {bool(info)}")
+                if not info:
+                    raise Exception("无法获取视频信息")
+                
+                # 获取最佳格式
+                best_format = None
+                for f in info.get('formats', []):
+                    if f.get('protocol', '').startswith('http'):
+                        if not best_format or f.get('filesize', 0) > best_format.get('filesize', 0):
+                            best_format = f
+
+                if not best_format:
+                    raise Exception("无法找到合适的视频格式")
+
+                video_info = {
+                    'id': info['id'],
+                    'title': info['title'],
+                    'author': info.get('uploader', 'Unknown'),
+                    'duration': info.get('duration', 0),
+                    'filesize': best_format.get('filesize', 0),
+                    'download_url': best_format['url'],
+                    'filename': f"{info['title']} - {info.get('uploader', 'Unknown')}",
+                    'download_time': datetime.now().isoformat()
+                }
+                
+                videos = load_videos_info()
+                videos.append(video_info)
+                videos = sorted(videos, key=lambda x: x['download_time'], reverse=True)[:3]
+                save_videos_info(videos)
+                
+                return {"status": "success", "video_info": video_info}
                 
             except Exception as e:
                 print(f"提取信息时出错: {str(e)}")
                 print(f"错误类型: {type(e).__name__}")
                 print(f"错误详情: {repr(e)}")
                 raise
-            
-            if not info:
-                raise Exception("无法获取视频信息")
-            
-            print("成功获取视频信息，开始处理格式...")
-            
-            # 获取直接下载链接
-            formats = info.get('formats', [])
-            if not formats:
-                raise Exception("无法获取视频格式信息")
-            
-            # 尝试获取任何可用的格式
-            download_url = None
-            for f in reversed(formats):  # 从后往前找，通常质量更好
-                if f.get('url'):
-                    download_url = f.get('url')
-                    break
-            
-            if not download_url:
-                raise Exception("无法获取下载链接")
-            
-            # 构建文件名
-            filename = f"{info['title']} - {info.get('uploader', 'Unknown')}"
-            
-            video_info = {
-                'id': info['id'],
-                'title': info['title'],
-                'author': info.get('uploader', 'Unknown'),
-                'duration': info.get('duration', 0),
-                'filesize': info.get('filesize', 0) or info.get('approximate_filesize', 0),
-                'download_url': download_url,
-                'filename': filename,
-                'download_time': datetime.now().isoformat()
-            }
-            
-            videos = load_videos_info()
-            videos.append(video_info)
-            videos = sorted(videos, key=lambda x: x['download_time'], reverse=True)[:3]
-            save_videos_info(videos)
-            
-            return {"status": "success", "video_info": video_info}
 
     except Exception as e:
         return {"status": "error", "message": str(e)}
