@@ -134,18 +134,25 @@ def get_ydl_opts():
         'youtube_include_dash_manifest': False,
         'extractor_args': {
             'youtube': {
-                'player_client': ['android', 'web'],  # 同时使用 android 和 web 客户端
+                'player_client': ['android'],
                 'player_skip': [],
-                'player_params': {'access_token': ''}  # 添加空 token
+                'player_params': {
+                    'access_token': '',
+                    'client': 'ANDROID',
+                    'c': 'ANDROID',
+                    'cver': '17.31.35'
+                }
             }
         },
         'http_headers': {
-            'User-Agent': 'Mozilla/5.0 (Linux; Android 12; SM-S906N Build/QP1A.190711.020; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/80.0.3987.119 Mobile Safari/537.36',
+            'User-Agent': 'com.google.android.youtube/17.31.35 (Linux; U; Android 11) gzip',
             'Accept': '*/*',
             'Accept-Language': 'en-US,en;q=0.9',
             'Accept-Encoding': 'gzip, deflate',
-            'Origin': 'https://m.youtube.com',
-            'Referer': 'https://m.youtube.com/'
+            'X-YouTube-Client-Name': '3',
+            'X-YouTube-Client-Version': '17.31.35',
+            'Origin': 'https://www.youtube.com',
+            'Referer': 'https://www.youtube.com/'
         },
         'socket_timeout': 30,
         'retries': 3,
