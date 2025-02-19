@@ -14,9 +14,17 @@ from urllib.parse import unquote
 from starlette.websockets import WebSocketState
 import certifi
 import ssl
+import requests
+import urllib3
 
 # 添加在文件开头
 os.environ['PYTHONHTTPSVERIFY'] = '0'
+
+# 禁用警告
+urllib3.disable_warnings()
+
+# 配置 requests
+requests.packages.urllib3.util.ssl_.DEFAULT_CIPHERS = 'ALL:@SECLEVEL=1'
 
 # 创建连接管理器
 class ConnectionManager:
@@ -113,9 +121,6 @@ async def home(request: Request):
 
 # yt-dlp配置
 def get_ydl_opts():
-    # 禁用 SSL 验证
-    ssl._create_default_https_context = ssl._create_unverified_context
-    
     base_opts = {
         'format': 'best[protocol^=http]',
         'quiet': False,
@@ -142,7 +147,10 @@ def get_ydl_opts():
         'ignoreerrors': False,
         'no_check_certificate': True,
         'nocheckcertificate': True,
-        'legacyserverconnect': True
+        'legacyserverconnect': True,
+        'requestsopts': {
+            'verify': False  # 禁用 requests 的证书验证
+        }
     }
     
     print(f"当前环境: {'Vercel' if os.environ.get('VERCEL') else '本地'}")

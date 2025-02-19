@@ -4,5 +4,7 @@ yt-dlp==2023.11.16
 python-multipart
 jinja2
 aiofiles
-certifi
+certifi>=2024.2.2
+requests>=2.31.0
+urllib3>=2.1.0
 websockets 
