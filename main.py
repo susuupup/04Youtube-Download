@@ -106,32 +106,45 @@ async def home(request: Request):
         {"request": request, "videos": recent_videos}
     )
 
+# yt-dlp配置
+def get_ydl_opts():
+    base_opts = {
+        'format': 'best',
+        'quiet': False,
+        'no_warnings': False,
+        'extract_info': True,
+        'verbose': True,
+        'http_headers': {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
+            'Accept': '*/*',
+            'Accept-Language': 'en-US,en;q=0.9',
+            'Origin': 'https://www.youtube.com',
+            'Referer': 'https://www.youtube.com/'
+        },
+        'socket_timeout': 30,
+        'retries': 5,
+        'ignoreerrors': True,
+        'no_check_certificate': True
+    }
+    
+    # 在 Vercel 环境中添加代理配置
+    if os.environ.get("VERCEL"):
+        base_opts.update({
+            'proxy': 'http://127.0.0.1:10809',  # 使用通用代理端口
+            'source_address': '0.0.0.0'  # 使用任意源地址
+        })
+    
+    return base_opts
+
 # 添加新的 API 路由
 @app.post("/api/download")
 async def download_video(video_url: str = Form(...)):
     try:
         print(f"收到视频URL: {video_url}")
         
-        # yt-dlp配置
-        ydl_opts = {
-            'format': 'best',  # 简化格式选择
-            'quiet': False,
-            'no_warnings': False,
-            'extract_info': True,
-            'verbose': True,
-            'http_headers': {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
-                'Accept': '*/*',
-                'Accept-Language': 'en-US,en;q=0.9',
-                'Origin': 'https://www.youtube.com',
-                'Referer': 'https://www.youtube.com/'
-            },
-            'socket_timeout': 30,
-            'retries': 5,  # 增加重试次数
-            'ignoreerrors': True,  # 忽略部分错误
-            'no_check_certificate': True  # 不检查证书
-        }
-
+        # 获取配置
+        ydl_opts = get_ydl_opts()
+        
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             print("获取视频信息...")
             info = ydl.extract_info(video_url, download=False)
