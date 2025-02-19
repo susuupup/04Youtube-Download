@@ -3,4 +3,5 @@ uvicorn
 yt-dlp
 python-multipart
 jinja2
-aiofiles 
+aiofiles
+certifi 

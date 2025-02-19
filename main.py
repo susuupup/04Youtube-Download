@@ -12,9 +12,6 @@ import yt_dlp
 from pathlib import Path
 from urllib.parse import unquote
 from starlette.websockets import WebSocketState
-import certifi
-import ssl
-ssl._create_default_https_context = ssl._create_unverified_context
 
 # 创建连接管理器
 class ConnectionManager:
@@ -136,6 +133,8 @@ async def websocket_endpoint(websocket: WebSocket):
             'http_headers': {
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
             },
+            'socket_timeout': 30,
+            'retries': 3
         }
 
         # 下载视频
