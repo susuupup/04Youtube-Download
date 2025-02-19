@@ -16,6 +16,8 @@ import certifi
 import ssl
 import requests
 import urllib3
+from googleapiclient.discovery import build
+from googleapiclient.errors import HttpError
 
 # 环境变量设置
 os.environ['PYTHONHTTPSVERIFY'] = '0'
@@ -164,58 +166,85 @@ def get_ydl_opts():
     
     return base_opts
 
+YOUTUBE_API_KEY = 'YOUR_API_KEY'  # 需要替换为实际的 API key
+
+def get_video_info(video_id):
+    youtube = build('youtube', 'v3', developerKey=YOUTUBE_API_KEY)
+    
+    try:
+        # 获取视频信息
+        video_response = youtube.videos().list(
+            part='snippet,contentDetails,statistics',
+            id=video_id
+        ).execute()
+
+        if not video_response['items']:
+            raise Exception("视频不存在")
+
+        video = video_response['items'][0]
+        
+        # 获取流 URL
+        ydl_opts = {
+            'format': 'best',
+            'quiet': True,
+            'no_warnings': True,
+            'extract_info': True
+        }
+        
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(f"https://www.youtube.com/watch?v={video_id}", download=False)
+            
+            if not info:
+                raise Exception("无法获取视频信息")
+            
+            formats = info.get('formats', [])
+            best_format = None
+            for f in formats:
+                if f.get('protocol', '').startswith('http'):
+                    if not best_format or f.get('filesize', 0) > best_format.get('filesize', 0):
+                        best_format = f
+            
+            if not best_format:
+                raise Exception("无法找到合适的视频格式")
+            
+            return {
+                'id': video_id,
+                'title': video['snippet']['title'],
+                'author': video['snippet']['channelTitle'],
+                'duration': video['contentDetails']['duration'],
+                'filesize': best_format.get('filesize', 0),
+                'download_url': best_format['url'],
+                'filename': f"{video['snippet']['title']} - {video['snippet']['channelTitle']}",
+                'download_time': datetime.now().isoformat()
+            }
+            
+    except HttpError as e:
+        print(f"YouTube API 错误: {e}")
+        raise Exception(f"YouTube API 错误: {str(e)}")
+    except Exception as e:
+        print(f"获取视频信息时出错: {str(e)}")
+        raise
+
 # 添加新的 API 路由
 @app.post("/api/download")
 async def download_video(video_url: str = Form(...)):
     try:
         print(f"收到视频URL: {video_url}")
-        print(f"运行环境: {'Vercel' if os.environ.get('VERCEL') else '本地'}")
         
-        # 获取配置
-        ydl_opts = get_ydl_opts()
+        # 从 URL 提取视频 ID
+        video_id = video_url.split('v=')[-1].split('&')[0]
         
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            print("开始获取视频信息...")
-            try:
-                # 直接获取完整信息
-                info = ydl.extract_info(video_url, download=False)
-                if not info:
-                    raise Exception("无法获取视频信息")
-                
-                # 获取最佳格式
-                best_format = None
-                for f in info.get('formats', []):
-                    if f.get('protocol', '').startswith('http'):
-                        if not best_format or f.get('filesize', 0) > best_format.get('filesize', 0):
-                            best_format = f
-
-                if not best_format:
-                    raise Exception("无法找到合适的视频格式")
-
-                video_info = {
-                    'id': info['id'],
-                    'title': info['title'],
-                    'author': info.get('uploader', 'Unknown'),
-                    'duration': info.get('duration', 0),
-                    'filesize': best_format.get('filesize', 0),
-                    'download_url': best_format['url'],
-                    'filename': f"{info['title']} - {info.get('uploader', 'Unknown')}",
-                    'download_time': datetime.now().isoformat()
-                }
-                
-                videos = load_videos_info()
-                videos.append(video_info)
-                videos = sorted(videos, key=lambda x: x['download_time'], reverse=True)[:3]
-                save_videos_info(videos)
-                
-                return {"status": "success", "video_info": video_info}
-                
-            except Exception as e:
-                print(f"提取信息时出错: {str(e)}")
-                print(f"错误类型: {type(e).__name__}")
-                print(f"错误详情: {repr(e)}")
-                raise
-
+        # 获取视频信息
+        video_info = get_video_info(video_id)
+        
+        # 保存到历史记录
+        videos = load_videos_info()
+        videos.append(video_info)
+        videos = sorted(videos, key=lambda x: x['download_time'], reverse=True)[:3]
+        save_videos_info(videos)
+        
+        return {"status": "success", "video_info": video_info}
+        
     except Exception as e:
         return {"status": "error", "message": str(e)}
 
