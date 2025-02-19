@@ -134,25 +134,19 @@ def get_ydl_opts():
         'youtube_include_dash_manifest': False,
         'extractor_args': {
             'youtube': {
-                'player_client': ['android'],
+                'skip': [],
                 'player_skip': [],
-                'player_params': {
-                    'access_token': '',
-                    'client': 'ANDROID',
-                    'c': 'ANDROID',
-                    'cver': '17.31.35'
-                }
+                'embed_webpage': True,  # 使用 embed 页面
+                'player_client': ['web_embedded']  # 使用 embed 播放器
             }
         },
         'http_headers': {
-            'User-Agent': 'com.google.android.youtube/17.31.35 (Linux; U; Android 11) gzip',
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
             'Accept': '*/*',
             'Accept-Language': 'en-US,en;q=0.9',
             'Accept-Encoding': 'gzip, deflate',
-            'X-YouTube-Client-Name': '3',
-            'X-YouTube-Client-Version': '17.31.35',
             'Origin': 'https://www.youtube.com',
-            'Referer': 'https://www.youtube.com/'
+            'Referer': 'https://www.youtube.com/embed/'
         },
         'socket_timeout': 30,
         'retries': 3,
@@ -179,11 +173,12 @@ def get_video_info(video_id):
     return get_video_info_fallback(video_id)
 
 def get_video_info_fallback(video_id):
-    """使用原来的 yt-dlp 方法作为回退"""
+    """使用 embed 方式获取视频信息"""
     ydl_opts = get_ydl_opts()
     
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-        info = ydl.extract_info(f"https://www.youtube.com/watch?v={video_id}", download=False)
+        # 使用 embed URL
+        info = ydl.extract_info(f"https://www.youtube.com/embed/{video_id}", download=False)
         
         if not info:
             raise Exception("无法获取视频信息")
