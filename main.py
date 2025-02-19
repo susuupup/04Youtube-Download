@@ -146,7 +146,8 @@ def get_ydl_opts():
             'Sec-Fetch-Mode': 'navigate',
             'Sec-Fetch-Site': 'same-origin',
             'Sec-Fetch-User': '?1',
-            'Upgrade-Insecure-Requests': '1'
+            'Upgrade-Insecure-Requests': '1',
+            'Cookie': 'CONSENT=YES+; Path=/; Domain=.youtube.com'
         },
         'socket_timeout': 30,
         'retries': 3,
@@ -154,7 +155,6 @@ def get_ydl_opts():
         'no_check_certificate': True,
         'nocheckcertificate': True,
         'legacyserverconnect': True,
-        'cookiesfrombrowser': ('chrome',),  # 使用 Chrome 的 cookies
         'requestsopts': {
             'verify': False,
             'timeout': 30
