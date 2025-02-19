@@ -114,24 +114,29 @@ def get_ydl_opts():
         'no_warnings': False,
         'extract_info': True,
         'verbose': True,
-        'force_generic_extractor': True,  # 使用通用提取器
+        'force_generic_extractor': False,
+        'extract_flat': True,
+        'youtube_include_dash_manifest': False,
         'extractor_args': {
             'youtube': {
-                'skip': ['dash', 'hls'],
-                'player_skip': ['js', 'configs', 'webpage']
+                'skip': ['dash', 'hls']
             }
         },
         'http_headers': {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
-            'Accept': '*/*',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
             'Accept-Language': 'en-US,en;q=0.9',
+            'Accept-Encoding': 'gzip, deflate',
             'Origin': 'https://www.youtube.com',
             'Referer': 'https://www.youtube.com/'
         },
-        'socket_timeout': 60,  # 增加超时时间
-        'retries': 10,  # 增加重试次数
+        'socket_timeout': 60,
+        'retries': 10,
         'ignoreerrors': True,
-        'no_check_certificate': True
+        'no_check_certificate': True,
+        'nocheckcertificate': True,
+        'prefer_insecure': True,
+        'geo_bypass': True
     }
     
     print(f"当前环境: {'Vercel' if os.environ.get('VERCEL') else '本地'}")
@@ -144,6 +149,7 @@ def get_ydl_opts():
 async def download_video(video_url: str = Form(...)):
     try:
         print(f"收到视频URL: {video_url}")
+        print(f"运行环境: {'Vercel' if os.environ.get('VERCEL') else '本地'}")
         
         # 获取配置
         ydl_opts = get_ydl_opts()
@@ -151,12 +157,25 @@ async def download_video(video_url: str = Form(...)):
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             print("开始获取视频信息...")
             try:
+                # 先尝试获取基本信息
+                print("尝试获取基本信息...")
+                basic_info = ydl.extract_info(video_url, download=False, process=False)
+                print(f"基本信息获取结果: {bool(basic_info)}")
+                if basic_info:
+                    print(f"视频ID: {basic_info.get('id')}")
+                    print(f"提取器: {basic_info.get('extractor')}")
+                
+                # 然后获取完整信息
+                print("尝试获取完整信息...")
                 info = ydl.extract_info(video_url, download=False)
-                print(f"提取信息结果: {bool(info)}")
+                print(f"完整信息获取结果: {bool(info)}")
+                
             except Exception as e:
                 print(f"提取信息时出错: {str(e)}")
+                print(f"错误类型: {type(e).__name__}")
+                print(f"错误详情: {repr(e)}")
                 raise
-                
+            
             if not info:
                 raise Exception("无法获取视频信息")
             
