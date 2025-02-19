@@ -47,7 +47,8 @@ app.add_middleware(
 )
 
 # 静态文件和模板配置
-app.mount("/static", StaticFiles(directory="static"), name="static")
+if not os.environ.get("VERCEL"):
+    app.mount("/static", StaticFiles(directory="static"), name="static")
 templates = Jinja2Templates(directory="templates")
 
 # 添加自定义过滤器
@@ -57,23 +58,29 @@ def get_basename(path):
 templates.env.filters["basename"] = get_basename
 
 # 视频存储路径
-VIDEOS_DIR = Path("static/videos")
-VIDEOS_DIR.mkdir(exist_ok=True, parents=True)
+VIDEOS_DIR = Path("/tmp/videos") if os.environ.get("VERCEL") else Path("static/videos")
+VIDEOS_INFO_FILE = "/tmp/videos_info.json" if os.environ.get("VERCEL") else "videos_info.json"
 
-# 视频信息文件
-VIDEOS_INFO_FILE = "videos_info.json"
+# 确保目录存在
+VIDEOS_DIR.mkdir(exist_ok=True, parents=True)
 
 # 加载视频信息
 def load_videos_info():
-    if os.path.exists(VIDEOS_INFO_FILE):
-        with open(VIDEOS_INFO_FILE, 'r', encoding='utf-8') as f:
-            return json.load(f)
+    try:
+        if os.path.exists(VIDEOS_INFO_FILE):
+            with open(VIDEOS_INFO_FILE, 'r', encoding='utf-8') as f:
+                return json.load(f)
+    except:
+        pass
     return []
 
 # 保存视频信息
 def save_videos_info(videos_info):
-    with open(VIDEOS_INFO_FILE, 'w', encoding='utf-8') as f:
-        json.dump(videos_info, f, ensure_ascii=False, indent=2)
+    try:
+        with open(VIDEOS_INFO_FILE, 'w', encoding='utf-8') as f:
+            json.dump(videos_info, f, ensure_ascii=False, indent=2)
+    except:
+        pass
 
 # 主页路由
 @app.get("/", response_class=HTMLResponse)

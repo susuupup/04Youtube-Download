@@ -7,6 +7,9 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from main import app
 
+# 设置 Vercel 环境变量
+os.environ["VERCEL"] = "1"
+
 # 配置静态文件和模板
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
