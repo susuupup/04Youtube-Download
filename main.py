@@ -63,6 +63,9 @@ def get_basename(path):
 
 templates.env.filters["basename"] = get_basename
 
+# 视频信息文件
+VIDEOS_INFO_FILE = "/tmp/videos_info.json" if os.environ.get("VERCEL") else "videos_info.json"
+
 # 加载视频信息
 def load_videos_info():
     try:
@@ -111,12 +114,9 @@ async def websocket_endpoint(websocket: WebSocket):
             'format': 'best',
             'quiet': True,
             'no_warnings': True,
-            'nocheckcertificate': True,
-            'extract_flat': True,  # 只获取元数据
-            'skip_download': True, # 不下载视频
+            'extract_info': True,
         }
 
-        # 获取视频信息
         try:
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                 print("获取视频信息...")
@@ -125,21 +125,35 @@ async def websocket_endpoint(websocket: WebSocket):
                 if not info:
                     raise Exception("无法获取视频信息")
                 
+                # 获取直接下载链接
+                formats = info.get('formats', [])
+                download_url = None
+                for f in formats:
+                    if f.get('format_id') == info.get('format_id'):
+                        download_url = f.get('url')
+                        break
+
+                if not download_url:
+                    raise Exception("无法获取下载链接")
+
+                # 构建文件名
+                filename = f"{info['title']} - {info.get('uploader', 'Unknown')}"
+                
                 video_info = {
                     'id': info['id'],
                     'title': info['title'],
                     'author': info.get('uploader', 'Unknown'),
                     'duration': info.get('duration', 0),
-                    'description': info.get('description', ''),
-                    'thumbnail': info.get('thumbnail', ''),
-                    'webpage_url': info.get('webpage_url', video_url),
-                    'view_count': info.get('view_count', 0),
-                    'like_count': info.get('like_count', 0),
+                    'filesize': info.get('filesize', 0) or info.get('approximate_filesize', 0),
+                    'download_url': download_url,
+                    'filename': filename,
                     'download_time': datetime.now().isoformat()
                 }
                 
                 videos = load_videos_info()
                 videos.append(video_info)
+                # 只保留最近3条记录
+                videos = sorted(videos, key=lambda x: x['download_time'], reverse=True)[:3]
                 save_videos_info(videos)
                 
                 await websocket.send_json({
