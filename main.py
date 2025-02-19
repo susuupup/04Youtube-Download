@@ -12,6 +12,8 @@ import yt_dlp
 from pathlib import Path
 from urllib.parse import unquote
 from starlette.websockets import WebSocketState
+import certifi
+import ssl
 
 # 创建连接管理器
 class ConnectionManager:
@@ -108,19 +110,23 @@ async def home(request: Request):
 
 # yt-dlp配置
 def get_ydl_opts():
+    # 配置 SSL 上下文
+    ssl_context = ssl.create_default_context(cafile=certifi.where())
+    ssl_context.check_hostname = False
+    ssl_context.verify_mode = ssl.CERT_NONE
+
     base_opts = {
-        'format': 'best[protocol^=http]',  # 只使用 HTTP 协议
+        'format': 'best[protocol^=http]',
         'quiet': False,
         'no_warnings': False,
         'extract_info': True,
         'verbose': True,
         'force_generic_extractor': False,
-        'extract_flat': False,  # 关闭扁平提取
+        'extract_flat': False,
         'youtube_include_dash_manifest': False,
         'extractor_args': {
             'youtube': {
-                'skip': [],  # 不跳过任何格式
-                'player_skip': []
+                'skip': []
             }
         },
         'http_headers': {
@@ -132,13 +138,16 @@ def get_ydl_opts():
         },
         'socket_timeout': 30,
         'retries': 3,
-        'ignoreerrors': False,  # 不忽略错误以便看到详细信息
+        'ignoreerrors': False,
         'no_check_certificate': True,
-        'nocheckcertificate': True
+        'nocheckcertificate': True,
+        'ssl_context': ssl_context,  # 添加 SSL 上下文
+        'legacyserverconnect': True  # 使用旧的连接方式
     }
     
     print(f"当前环境: {'Vercel' if os.environ.get('VERCEL') else '本地'}")
-    print(f"使用的配置: {json.dumps(base_opts, indent=2)}")
+    print(f"使用的配置: {json.dumps({k: v for k, v in base_opts.items() if k != 'ssl_context'}, indent=2)}")
+    print(f"证书路径: {certifi.where()}")
     
     return base_opts
 
