@@ -91,7 +91,9 @@
             progress.classList.remove('hidden');
             progressText.textContent = '正在获取下载链接...';
 
-            const ws = new WebSocket(`ws://${window.location.host}/ws`);
+            // 根据页面协议选择 WebSocket 协议
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const ws = new WebSocket(`${protocol}//${window.location.host}/ws`);
 
             ws.onopen = function() {
                 console.log("WebSocket连接已打开");
