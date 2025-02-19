@@ -1,0 +1,6 @@
+venv/
+__pycache__/
+*.pyc
+static/videos/*
+videos_info.json
+.env 

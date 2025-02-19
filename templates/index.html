@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>YouTube Video Downloader</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100">
+    <div class="container mx-auto px-4 py-8">
+        <!-- 标题部分 -->
+        <div class="text-center mb-8">
+            <h1 class="text-4xl font-bold text-gray-800 mb-2">YouTube Video Downloader</h1>
+            <p class="text-gray-600">输入YouTube视频链接开始下载</p>
+        </div>
+
+        <!-- 下载表单 -->
+        <div class="max-w-xl mx-auto bg-white rounded-lg shadow-md p-6 mb-8">
+            <div class="flex gap-2">
+                <input type="text" 
+                       id="video-url" 
+                       class="flex-1 px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                       placeholder="https://www.youtube.com/watch?v=...">
+                <button onclick="startDownload()"
+                        class="px-6 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">
+                    下载
+                </button>
+            </div>
+            
+            <!-- 下载进度 -->
+            <div id="progress" class="hidden mt-4">
+                <div class="w-full bg-gray-200 rounded-full h-2.5">
+                    <div id="progress-bar" class="bg-blue-500 h-2.5 rounded-full" style="width: 0%"></div>
+                </div>
+                <div class="mt-2 text-sm text-gray-600">
+                    <span id="progress-text">准备下载...</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- 视频列表 -->
+        <div class="mt-8">
+            <h2 class="text-2xl font-bold text-gray-800 mb-4">最近下载的视频</h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {% for video in videos %}
+                <div class="bg-white rounded-lg shadow-md overflow-hidden">
+                    <div class="p-4">
+                        <div class="flex justify-between items-start mb-2">
+                            <h3 class="text-lg font-semibold text-gray-800">{{ video.title }}</h3>
+                            <button onclick="deleteVideo('{{ video.id }}')" 
+                                    class="text-red-500 hover:text-red-700 focus:outline-none">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                                          d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16">
+                                    </path>
+                                </svg>
+                            </button>
+                        </div>
+                        <p class="text-sm text-gray-600 mb-2">上传者: {{ video.author }}</p>
+                        <p class="text-sm text-gray-600 mb-4">时长: {{ video.duration }}秒</p>
+                        <div class="aspect-w-16 aspect-h-9">
+                            <video controls class="w-full">
+                                <source src="/static/videos/{{ video.filepath|basename }}" type="video/mp4">
+                                Your browser does not support the video tag.
+                            </video>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <script>
+        async function startDownload() {
+            const videoUrl = document.getElementById('video-url').value;
+            if (!videoUrl) {
+                alert('请输入视频链接');
+                return;
+            }
+
+            const progress = document.getElementById('progress');
+            const progressBar = document.getElementById('progress-bar');
+            const progressText = document.getElementById('progress-text');
+            progress.classList.remove('hidden');
+
+            // 修改WebSocket连接部分
+            const ws = new WebSocket(`ws://${window.location.host}/ws`);
+
+            ws.onopen = function() {
+                console.log("WebSocket连接已打开");
+                try {
+                    const cleanUrl = videoUrl.trim();
+                    console.log("准备发送URL:", cleanUrl);
+                    setTimeout(() => {  // 添加短暂延迟
+                        ws.send(cleanUrl);
+                    }, 100);
+                } catch (error) {
+                    console.error("发送URL时出错:", error);
+                    progressText.textContent = `发送URL时出错: ${error.message}`;
+                }
+            };
+
+            ws.onmessage = function(event) {
+                console.log("收到消息:", event.data);
+                const data = JSON.parse(event.data);
+                
+                if (data.status === 'downloading') {
+                    progressBar.style.width = data.percentage;
+                    progressText.textContent = `下载中: ${data.percentage} (${data.speed}) ETA: ${data.eta}`;
+                }
+                else if (data.status === 'complete') {
+                    progressText.textContent = '下载完成!';
+                    setTimeout(() => {
+                        progress.classList.add('hidden');
+                        location.reload();
+                    }, 1000);
+                }
+                else if (data.status === 'error') {
+                    progressText.textContent = `错误: ${data.message}`;
+                    progress.classList.add('error');
+                }
+            };
+
+            ws.onclose = function(event) {
+                console.log("WebSocket连接已关闭", event.code, event.reason);
+                if (event.code === 1006) {
+                    progressText.textContent = "连接异常断开，请刷新页面重试";
+                } else {
+                    progressText.textContent = "连接已断开";
+                }
+                progress.classList.add('error');
+            };
+
+            ws.onerror = function(error) {
+                console.error("WebSocket错误:", error);
+                progressText.textContent = "连接错误，请刷新页面重试";
+                progress.classList.add('error');
+            };
+        }
+
+        async function deleteVideo(videoId) {
+            if (!confirm('确定要删除这个视频吗？')) {
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/api/videos/${videoId}`, {
+                    method: 'DELETE',
+                });
+                const data = await response.json();
+                
+                if (data.status === 'success') {
+                    // 刷新页面显示更新后的视频列表
+                    location.reload();
+                } else {
+                    alert('删除失败: ' + data.message);
+                }
+            } catch (error) {
+                alert('删除失败: ' + error.message);
+            }
+        }
+    </script>
+</body>
+</html> 
