@@ -46,14 +46,29 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# 根据环境设置路径
+if os.environ.get("VERCEL"):
+    # Vercel 环境使用 /tmp 目录
+    BASE_DIR = Path("/tmp")
+    STATIC_DIR = BASE_DIR / "static"
+    VIDEOS_DIR = STATIC_DIR / "videos"
+    VIDEOS_INFO_FILE = BASE_DIR / "videos_info.json"
+else:
+    # 本地环境使用项目目录
+    BASE_DIR = Path(".")
+    STATIC_DIR = BASE_DIR / "static"
+    VIDEOS_DIR = STATIC_DIR / "videos"
+    VIDEOS_INFO_FILE = BASE_DIR / "videos_info.json"
+
+# 确保目录存在
+STATIC_DIR.mkdir(exist_ok=True, parents=True)
+VIDEOS_DIR.mkdir(exist_ok=True, parents=True)
+
 # 静态文件和模板配置
 if not os.environ.get("VERCEL"):
     app.mount("/static", StaticFiles(directory="static"), name="static")
 else:
-    # Vercel 环境下使用不同的静态文件配置
-    app.mount("/static", StaticFiles(directory="/tmp/static"), name="static")
-    # 确保目录存在
-    os.makedirs("/tmp/static/videos", exist_ok=True)
+    app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
 templates = Jinja2Templates(directory="templates")
 
@@ -63,26 +78,21 @@ def get_basename(path):
 
 templates.env.filters["basename"] = get_basename
 
-# 视频信息文件
-VIDEOS_INFO_FILE = "/tmp/videos_info.json" if os.environ.get("VERCEL") else "videos_info.json"
-
 # 加载视频信息
 def load_videos_info():
     try:
-        if os.path.exists(VIDEOS_INFO_FILE):
-            with open(VIDEOS_INFO_FILE, 'r', encoding='utf-8') as f:
-                return json.load(f)
-    except:
-        pass
+        if VIDEOS_INFO_FILE.exists():
+            return json.loads(VIDEOS_INFO_FILE.read_text(encoding='utf-8'))
+    except Exception as e:
+        print(f"加载视频信息失败: {e}")
     return []
 
 # 保存视频信息
 def save_videos_info(videos_info):
     try:
-        with open(VIDEOS_INFO_FILE, 'w', encoding='utf-8') as f:
-            json.dump(videos_info, f, ensure_ascii=False, indent=2)
-    except:
-        pass
+        VIDEOS_INFO_FILE.write_text(json.dumps(videos_info, ensure_ascii=False, indent=2), encoding='utf-8')
+    except Exception as e:
+        print(f"保存视频信息失败: {e}")
 
 # 主页路由
 @app.get("/", response_class=HTMLResponse)
