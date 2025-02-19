@@ -16,8 +16,6 @@ import certifi
 import ssl
 import requests
 import urllib3
-from googleapiclient.discovery import build
-from googleapiclient.errors import HttpError
 
 # 环境变量设置
 os.environ['PYTHONHTTPSVERIFY'] = '0'
@@ -166,64 +164,43 @@ def get_ydl_opts():
     
     return base_opts
 
-YOUTUBE_API_KEY = 'YOUR_API_KEY'  # 需要替换为实际的 API key
+# 从环境变量获取 API key
+YOUTUBE_API_KEY = os.environ.get('YOUTUBE_API_KEY')
 
 def get_video_info(video_id):
-    youtube = build('youtube', 'v3', developerKey=YOUTUBE_API_KEY)
+    """直接使用回退方法"""
+    return get_video_info_fallback(video_id)
+
+def get_video_info_fallback(video_id):
+    """使用原来的 yt-dlp 方法作为回退"""
+    ydl_opts = get_ydl_opts()
     
-    try:
-        # 获取视频信息
-        video_response = youtube.videos().list(
-            part='snippet,contentDetails,statistics',
-            id=video_id
-        ).execute()
-
-        if not video_response['items']:
-            raise Exception("视频不存在")
-
-        video = video_response['items'][0]
+    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+        info = ydl.extract_info(f"https://www.youtube.com/watch?v={video_id}", download=False)
         
-        # 获取流 URL
-        ydl_opts = {
-            'format': 'best',
-            'quiet': True,
-            'no_warnings': True,
-            'extract_info': True
+        if not info:
+            raise Exception("无法获取视频信息")
+        
+        formats = info.get('formats', [])
+        best_format = None
+        for f in formats:
+            if f.get('protocol', '').startswith('http'):
+                if not best_format or f.get('filesize', 0) > best_format.get('filesize', 0):
+                    best_format = f
+        
+        if not best_format:
+            raise Exception("无法找到合适的视频格式")
+        
+        return {
+            'id': info['id'],
+            'title': info['title'],
+            'author': info.get('uploader', 'Unknown'),
+            'duration': info.get('duration', 0),
+            'filesize': best_format.get('filesize', 0),
+            'download_url': best_format['url'],
+            'filename': f"{info['title']} - {info.get('uploader', 'Unknown')}",
+            'download_time': datetime.now().isoformat()
         }
-        
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(f"https://www.youtube.com/watch?v={video_id}", download=False)
-            
-            if not info:
-                raise Exception("无法获取视频信息")
-            
-            formats = info.get('formats', [])
-            best_format = None
-            for f in formats:
-                if f.get('protocol', '').startswith('http'):
-                    if not best_format or f.get('filesize', 0) > best_format.get('filesize', 0):
-                        best_format = f
-            
-            if not best_format:
-                raise Exception("无法找到合适的视频格式")
-            
-            return {
-                'id': video_id,
-                'title': video['snippet']['title'],
-                'author': video['snippet']['channelTitle'],
-                'duration': video['contentDetails']['duration'],
-                'filesize': best_format.get('filesize', 0),
-                'download_url': best_format['url'],
-                'filename': f"{video['snippet']['title']} - {video['snippet']['channelTitle']}",
-                'download_time': datetime.now().isoformat()
-            }
-            
-    except HttpError as e:
-        print(f"YouTube API 错误: {e}")
-        raise Exception(f"YouTube API 错误: {str(e)}")
-    except Exception as e:
-        print(f"获取视频信息时出错: {str(e)}")
-        raise
 
 # 添加新的 API 路由
 @app.post("/api/download")
