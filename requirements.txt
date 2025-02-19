@@ -1,6 +1,6 @@
 fastapi
 uvicorn
-yt-dlp
+yt-dlp>=2024.2.13
 python-multipart
 jinja2
 aiofiles

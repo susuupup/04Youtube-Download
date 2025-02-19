@@ -115,9 +115,11 @@ async def download_video(video_url: str = Form(...)):
         # yt-dlp配置
         ydl_opts = {
             'format': 'best',
-            'quiet': True,
-            'no_warnings': True,
+            'quiet': False,  # 启用详细输出以便调试
+            'no_warnings': False,  # 显示警告信息
             'extract_info': True,
+            'verbose': True,  # 添加详细日志
+            'force_generic_extractor': False,
             'http_headers': {
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
                 'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
@@ -131,27 +133,41 @@ async def download_video(video_url: str = Form(...)):
                 'Sec-Fetch-Mode': 'navigate',
                 'Sec-Fetch-Site': 'same-origin',
                 'Sec-Fetch-User': '?1',
-                'Upgrade-Insecure-Requests': '1',
-                'X-Youtube-Client-Name': '1',
-                'X-Youtube-Client-Version': '2.20240215.01.00'
+                'Upgrade-Insecure-Requests': '1'
             }
         }
 
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             print("获取视频信息...")
-            info = ydl.extract_info(video_url, download=False)
+            # 先尝试获取基本信息
+            basic_info = ydl.extract_info(video_url, download=False, process=False)
+            if not basic_info:
+                raise Exception("无法获取视频基本信息")
             
+            # 然后获取完整信息
+            info = ydl.extract_info(video_url, download=False)
             if not info:
-                raise Exception("无法获取视频信息")
+                raise Exception("无法获取完整视频信息")
             
             # 获取直接下载链接
             formats = info.get('formats', [])
+            if not formats:
+                raise Exception("无法获取视频格式信息")
+            
+            # 选择最佳格式
             download_url = None
             for f in formats:
                 if f.get('format_id') == info.get('format_id'):
                     download_url = f.get('url')
                     break
-
+                
+            if not download_url:
+                # 尝试获取任何可用的格式
+                for f in formats:
+                    if f.get('url'):
+                        download_url = f.get('url')
+                        break
+                    
             if not download_url:
                 raise Exception("无法获取下载链接")
 
