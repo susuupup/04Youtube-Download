@@ -49,6 +49,12 @@ app.add_middleware(
 # 静态文件和模板配置
 if not os.environ.get("VERCEL"):
     app.mount("/static", StaticFiles(directory="static"), name="static")
+else:
+    # Vercel 环境下使用不同的静态文件配置
+    app.mount("/static", StaticFiles(directory="/tmp/static"), name="static")
+    # 确保目录存在
+    os.makedirs("/tmp/static/videos", exist_ok=True)
+
 templates = Jinja2Templates(directory="templates")
 
 # 添加自定义过滤器
@@ -56,13 +62,6 @@ def get_basename(path):
     return os.path.basename(path)
 
 templates.env.filters["basename"] = get_basename
-
-# 视频存储路径
-VIDEOS_DIR = Path("/tmp/videos") if os.environ.get("VERCEL") else Path("static/videos")
-VIDEOS_INFO_FILE = "/tmp/videos_info.json" if os.environ.get("VERCEL") else "videos_info.json"
-
-# 确保目录存在
-VIDEOS_DIR.mkdir(exist_ok=True, parents=True)
 
 # 加载视频信息
 def load_videos_info():
@@ -107,56 +106,24 @@ async def websocket_endpoint(websocket: WebSocket):
         video_url = unquote(data).strip()
         print(f"收到视频URL: {video_url}")
 
-        # 进度回调
-        def progress_callback(d):
-            try:
-                if d['status'] == 'downloading':
-                    progress = {
-                        'status': 'downloading',
-                        'percentage': d.get('_percent_str', '0%'),
-                        'speed': d.get('_speed_str', 'N/A'),
-                        'eta': d.get('_eta_str', 'N/A')
-                    }
-                    asyncio.run_coroutine_threadsafe(
-                        websocket.send_json(progress),
-                        asyncio.get_event_loop()
-                    )
-                elif d['status'] == 'finished':
-                    asyncio.run_coroutine_threadsafe(
-                        websocket.send_json({'status': 'finished'}),
-                        asyncio.get_event_loop()
-                    )
-            except Exception as e:
-                print(f"发送进度信息时出错: {str(e)}")
-
         # yt-dlp配置
         ydl_opts = {
             'format': 'best',
-            'outtmpl': str(VIDEOS_DIR / '%(title)s.%(ext)s'),
-            'progress_hooks': [progress_callback],
             'quiet': True,
             'no_warnings': True,
             'nocheckcertificate': True,
-            'http_headers': {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
-            },
-            'socket_timeout': 30,
-            'retries': 3
+            'extract_flat': True,  # 只获取元数据
+            'skip_download': True, # 不下载视频
         }
 
-        # 下载视频
+        # 获取视频信息
         try:
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                print("开始下载...")
-                info = ydl.extract_info(video_url, download=True)
+                print("获取视频信息...")
+                info = ydl.extract_info(video_url, download=False)
                 
                 if not info:
                     raise Exception("无法获取视频信息")
-
-                video_path = str(VIDEOS_DIR / f"{info['title']}.{info['ext']}")
-                
-                if not os.path.exists(video_path):
-                    raise Exception("下载失败：文件未创建")
                 
                 video_info = {
                     'id': info['id'],
@@ -164,8 +131,10 @@ async def websocket_endpoint(websocket: WebSocket):
                     'author': info.get('uploader', 'Unknown'),
                     'duration': info.get('duration', 0),
                     'description': info.get('description', ''),
-                    'filepath': video_path,
-                    'filesize': os.path.getsize(video_path),
+                    'thumbnail': info.get('thumbnail', ''),
+                    'webpage_url': info.get('webpage_url', video_url),
+                    'view_count': info.get('view_count', 0),
+                    'like_count': info.get('like_count', 0),
                     'download_time': datetime.now().isoformat()
                 }
                 
@@ -177,10 +146,10 @@ async def websocket_endpoint(websocket: WebSocket):
                     'status': 'complete',
                     'video_info': video_info
                 })
-                print("下载完成")
+                print("信息获取完成")
 
         except Exception as e:
-            error_msg = f"下载错误: {str(e)}"
+            error_msg = f"错误: {str(e)}"
             print(error_msg)
             await websocket.send_json({
                 'status': 'error',
