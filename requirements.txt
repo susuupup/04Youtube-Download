@@ -1,10 +1,10 @@
 fastapi
 uvicorn
-yt-dlp==2023.11.16
+yt-dlp==2023.7.6
 python-multipart
 jinja2
 aiofiles
 certifi>=2024.2.2
 requests>=2.31.0
-urllib3>=2.1.0
+urllib3<2.0.0
 websockets 

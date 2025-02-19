@@ -17,8 +17,10 @@ import ssl
 import requests
 import urllib3
 
-# 添加在文件开头
+# 环境变量设置
 os.environ['PYTHONHTTPSVERIFY'] = '0'
+os.environ['REQUESTS_CA_BUNDLE'] = ''
+os.environ['SSL_CERT_FILE'] = ''
 
 # 禁用警告
 urllib3.disable_warnings()
@@ -122,7 +124,7 @@ async def home(request: Request):
 # yt-dlp配置
 def get_ydl_opts():
     base_opts = {
-        'format': 'best[protocol^=http]',
+        'format': 'best',  # 简化格式选择
         'quiet': False,
         'no_warnings': False,
         'extract_info': True,
@@ -130,11 +132,6 @@ def get_ydl_opts():
         'force_generic_extractor': False,
         'extract_flat': False,
         'youtube_include_dash_manifest': False,
-        'extractor_args': {
-            'youtube': {
-                'skip': []
-            }
-        },
         'http_headers': {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
             'Accept': '*/*',
@@ -149,7 +146,8 @@ def get_ydl_opts():
         'nocheckcertificate': True,
         'legacyserverconnect': True,
         'requestsopts': {
-            'verify': False  # 禁用 requests 的证书验证
+            'verify': False,
+            'timeout': 30
         }
     }
     
