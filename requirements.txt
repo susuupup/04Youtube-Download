@@ -4,4 +4,5 @@ yt-dlp
 python-multipart
 jinja2
 aiofiles
-certifi 
+certifi
+websockets 
