@@ -17,7 +17,8 @@
         <!-- 标题部分 -->
         <div class="text-center mb-8">
             <h1 class="text-4xl font-bold text-gray-800 mb-2">YouTube 视频下载</h1>
-            <p class="text-gray-600">输入YouTube视频链接开始下载</p>
+            <p class="text-gray-600 mb-2">输入YouTube视频链接开始下载</p>
+            <p class="text-sm text-gray-500">Made by Su, Test by Professor Du</p>
         </div>
 
         <!-- 输入表单 -->
@@ -109,18 +110,14 @@
                 const data = await response.json();
                 
                 if (data.status === 'success') {
-                    progressText.textContent = '开始下载...';
-                    // 创建下载链接
-                    const a = document.createElement('a');
-                    a.href = data.video_info.download_url;
-                    a.download = data.video_info.filename;
-                    document.body.appendChild(a);
-                    a.click();
-                    document.body.removeChild(a);
+                    progressText.textContent = '正在打开视频...';
+                    // 在新窗口打开视频
+                    window.open(data.video_info.download_url, '_blank');
                     
                     setTimeout(() => {
                         progress.classList.add('hidden');
-                        location.reload();
+                        // 不再刷新页面
+                        // location.reload();
                     }, 1000);
                 } else {
                     progressText.textContent = `错误: ${data.message}`;
