@@ -114,20 +114,22 @@ async def download_video(video_url: str = Form(...)):
         
         # yt-dlp配置
         ydl_opts = {
-            'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best',  # 更具体的格式选择
+            'format': 'best',  # 简化格式选择
             'quiet': False,
             'no_warnings': False,
             'extract_info': True,
             'verbose': True,
-            'force_generic_extractor': False,
-            'youtube_include_dash_manifest': False,  # 禁用 DASH manifest
             'http_headers': {
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
-                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-                'Accept-Language': 'en-us,en;q=0.5',
-                'Accept-Encoding': 'gzip, deflate',
-                'Referer': 'https://www.youtube.com'
-            }
+                'Accept': '*/*',
+                'Accept-Language': 'en-US,en;q=0.9',
+                'Origin': 'https://www.youtube.com',
+                'Referer': 'https://www.youtube.com/'
+            },
+            'socket_timeout': 30,
+            'retries': 5,  # 增加重试次数
+            'ignoreerrors': True,  # 忽略部分错误
+            'no_check_certificate': True  # 不检查证书
         }
 
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
