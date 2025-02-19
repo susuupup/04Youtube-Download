@@ -1,4 +1,4 @@
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, WebSocketException, Depends
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, WebSocketException, Depends, Form
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from fastapi.responses import HTMLResponse
@@ -106,19 +106,12 @@ async def home(request: Request):
         {"request": request, "videos": recent_videos}
     )
 
-# 修改WebSocket路由
-@app.websocket("/ws")
-async def websocket_endpoint(websocket: WebSocket):
+# 添加新的 API 路由
+@app.post("/api/download")
+async def download_video(video_url: str = Form(...)):
     try:
-        print("新的WebSocket连接请求")
-        await websocket.accept()
-        print("WebSocket连接已接受")
-        
-        # 等待接收视频URL
-        data = await websocket.receive_text()
-        video_url = unquote(data).strip()
         print(f"收到视频URL: {video_url}")
-
+        
         # yt-dlp配置
         ydl_opts = {
             'format': 'best',
@@ -127,76 +120,47 @@ async def websocket_endpoint(websocket: WebSocket):
             'extract_info': True,
         }
 
-        try:
-            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                print("获取视频信息...")
-                info = ydl.extract_info(video_url, download=False)
-                
-                if not info:
-                    raise Exception("无法获取视频信息")
-                
-                # 获取直接下载链接
-                formats = info.get('formats', [])
-                download_url = None
-                for f in formats:
-                    if f.get('format_id') == info.get('format_id'):
-                        download_url = f.get('url')
-                        break
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            print("获取视频信息...")
+            info = ydl.extract_info(video_url, download=False)
+            
+            if not info:
+                raise Exception("无法获取视频信息")
+            
+            # 获取直接下载链接
+            formats = info.get('formats', [])
+            download_url = None
+            for f in formats:
+                if f.get('format_id') == info.get('format_id'):
+                    download_url = f.get('url')
+                    break
 
-                if not download_url:
-                    raise Exception("无法获取下载链接")
+            if not download_url:
+                raise Exception("无法获取下载链接")
 
-                # 构建文件名
-                filename = f"{info['title']} - {info.get('uploader', 'Unknown')}"
-                
-                video_info = {
-                    'id': info['id'],
-                    'title': info['title'],
-                    'author': info.get('uploader', 'Unknown'),
-                    'duration': info.get('duration', 0),
-                    'filesize': info.get('filesize', 0) or info.get('approximate_filesize', 0),
-                    'download_url': download_url,
-                    'filename': filename,
-                    'download_time': datetime.now().isoformat()
-                }
-                
-                videos = load_videos_info()
-                videos.append(video_info)
-                # 只保留最近3条记录
-                videos = sorted(videos, key=lambda x: x['download_time'], reverse=True)[:3]
-                save_videos_info(videos)
-                
-                await websocket.send_json({
-                    'status': 'complete',
-                    'video_info': video_info
-                })
-                print("信息获取完成")
+            # 构建文件名
+            filename = f"{info['title']} - {info.get('uploader', 'Unknown')}"
+            
+            video_info = {
+                'id': info['id'],
+                'title': info['title'],
+                'author': info.get('uploader', 'Unknown'),
+                'duration': info.get('duration', 0),
+                'filesize': info.get('filesize', 0) or info.get('approximate_filesize', 0),
+                'download_url': download_url,
+                'filename': filename,
+                'download_time': datetime.now().isoformat()
+            }
+            
+            videos = load_videos_info()
+            videos.append(video_info)
+            videos = sorted(videos, key=lambda x: x['download_time'], reverse=True)[:3]
+            save_videos_info(videos)
+            
+            return {"status": "success", "video_info": video_info}
 
-        except Exception as e:
-            error_msg = f"错误: {str(e)}"
-            print(error_msg)
-            await websocket.send_json({
-                'status': 'error',
-                'message': error_msg
-            })
-
-    except WebSocketDisconnect:
-        print("WebSocket连接断开")
     except Exception as e:
-        error_msg = f"发生错误: {str(e)}"
-        print(error_msg)
-        try:
-            await websocket.send_json({
-                'status': 'error',
-                'message': error_msg
-            })
-        except:
-            print("无法发送错误消息")
-    finally:
-        try:
-            await websocket.close()
-        except:
-            pass
+        return {"status": "error", "message": str(e)}
 
 # 添加删除视频的路由
 @app.delete("/api/videos/{video_id}")
