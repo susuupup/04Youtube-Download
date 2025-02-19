@@ -97,27 +97,18 @@
             progress.classList.remove('hidden');
             progressText.textContent = '正在获取下载链接...';
 
-            // 根据页面协议选择 WebSocket 协议
-            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-            const ws = new WebSocket(`${protocol}//${window.location.host}/ws`);
+            try {
+                const formData = new FormData();
+                formData.append('video_url', videoUrl.trim());
 
-            ws.onopen = function() {
-                console.log("WebSocket连接已打开");
-                try {
-                    const cleanUrl = videoUrl.trim();
-                    console.log("准备发送URL:", cleanUrl);
-                    ws.send(cleanUrl);
-                } catch (error) {
-                    console.error("发送URL时出错:", error);
-                    progressText.textContent = `发送URL时出错: ${error.message}`;
-                }
-            };
+                const response = await fetch('/api/download', {
+                    method: 'POST',
+                    body: formData
+                });
 
-            ws.onmessage = function(event) {
-                console.log("收到消息:", event.data);
-                const data = JSON.parse(event.data);
+                const data = await response.json();
                 
-                if (data.status === 'complete') {
+                if (data.status === 'success') {
                     progressText.textContent = '开始下载...';
                     // 创建下载链接
                     const a = document.createElement('a');
@@ -131,26 +122,14 @@
                         progress.classList.add('hidden');
                         location.reload();
                     }, 1000);
-                }
-                else if (data.status === 'error') {
+                } else {
                     progressText.textContent = `错误: ${data.message}`;
                     progress.classList.add('error');
                 }
-            };
-
-            ws.onclose = function(event) {
-                if (event.code === 1006) {
-                    progressText.textContent = "连接异常断开，请刷新页面重试";
-                } else {
-                    progressText.textContent = "连接已断开";
-                }
+            } catch (error) {
+                progressText.textContent = `请求失败: ${error.message}`;
                 progress.classList.add('error');
-            };
-
-            ws.onerror = function(error) {
-                progressText.textContent = "连接错误，请刷新页面重试";
-                progress.classList.add('error');
-            };
+            }
         }
 
         async function deleteVideo(videoId) {
