@@ -15,6 +15,9 @@ from starlette.websockets import WebSocketState
 import certifi
 import ssl
 
+# 添加在文件开头
+os.environ['PYTHONHTTPSVERIFY'] = '0'
+
 # 创建连接管理器
 class ConnectionManager:
     def __init__(self):
@@ -110,11 +113,9 @@ async def home(request: Request):
 
 # yt-dlp配置
 def get_ydl_opts():
-    # 配置 SSL 上下文
-    ssl_context = ssl.create_default_context(cafile=certifi.where())
-    ssl_context.check_hostname = False
-    ssl_context.verify_mode = ssl.CERT_NONE
-
+    # 禁用 SSL 验证
+    ssl._create_default_https_context = ssl._create_unverified_context
+    
     base_opts = {
         'format': 'best[protocol^=http]',
         'quiet': False,
@@ -141,13 +142,11 @@ def get_ydl_opts():
         'ignoreerrors': False,
         'no_check_certificate': True,
         'nocheckcertificate': True,
-        'ssl_context': ssl_context,  # 添加 SSL 上下文
-        'legacyserverconnect': True  # 使用旧的连接方式
+        'legacyserverconnect': True
     }
     
     print(f"当前环境: {'Vercel' if os.environ.get('VERCEL') else '本地'}")
-    print(f"使用的配置: {json.dumps({k: v for k, v in base_opts.items() if k != 'ssl_context'}, indent=2)}")
-    print(f"证书路径: {certifi.where()}")
+    print(f"使用的配置: {json.dumps(base_opts, indent=2)}")
     
     return base_opts
 
