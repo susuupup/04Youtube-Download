@@ -124,7 +124,7 @@ async def home(request: Request):
 # yt-dlp配置
 def get_ydl_opts():
     base_opts = {
-        'format': 'best',  # 简化格式选择
+        'format': 'best',
         'quiet': False,
         'no_warnings': False,
         'extract_info': True,
@@ -134,10 +134,19 @@ def get_ydl_opts():
         'youtube_include_dash_manifest': False,
         'http_headers': {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
-            'Accept': '*/*',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
             'Accept-Language': 'en-US,en;q=0.9',
+            'Accept-Encoding': 'gzip, deflate, br',
             'Origin': 'https://www.youtube.com',
-            'Referer': 'https://www.youtube.com/'
+            'Referer': 'https://www.youtube.com/',
+            'Sec-Ch-Ua': '"Not A(Brand";v="99", "Google Chrome";v="121", "Chromium";v="121"',
+            'Sec-Ch-Ua-Mobile': '?0',
+            'Sec-Ch-Ua-Platform': '"Windows"',
+            'Sec-Fetch-Dest': 'document',
+            'Sec-Fetch-Mode': 'navigate',
+            'Sec-Fetch-Site': 'same-origin',
+            'Sec-Fetch-User': '?1',
+            'Upgrade-Insecure-Requests': '1'
         },
         'socket_timeout': 30,
         'retries': 3,
@@ -145,6 +154,7 @@ def get_ydl_opts():
         'no_check_certificate': True,
         'nocheckcertificate': True,
         'legacyserverconnect': True,
+        'cookiesfrombrowser': ('chrome',),  # 使用 Chrome 的 cookies
         'requestsopts': {
             'verify': False,
             'timeout': 30
