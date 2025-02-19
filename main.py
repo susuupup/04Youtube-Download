@@ -114,6 +114,13 @@ def get_ydl_opts():
         'no_warnings': False,
         'extract_info': True,
         'verbose': True,
+        'force_generic_extractor': True,  # 使用通用提取器
+        'extractor_args': {
+            'youtube': {
+                'skip': ['dash', 'hls'],
+                'player_skip': ['js', 'configs', 'webpage']
+            }
+        },
         'http_headers': {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
             'Accept': '*/*',
@@ -121,18 +128,14 @@ def get_ydl_opts():
             'Origin': 'https://www.youtube.com',
             'Referer': 'https://www.youtube.com/'
         },
-        'socket_timeout': 30,
-        'retries': 5,
+        'socket_timeout': 60,  # 增加超时时间
+        'retries': 10,  # 增加重试次数
         'ignoreerrors': True,
         'no_check_certificate': True
     }
     
-    # 在 Vercel 环境中添加代理配置
-    if os.environ.get("VERCEL"):
-        base_opts.update({
-            'proxy': 'http://127.0.0.1:10809',  # 使用通用代理端口
-            'source_address': '0.0.0.0'  # 使用任意源地址
-        })
+    print(f"当前环境: {'Vercel' if os.environ.get('VERCEL') else '本地'}")
+    print(f"使用的配置: {json.dumps(base_opts, indent=2)}")
     
     return base_opts
 
@@ -146,10 +149,18 @@ async def download_video(video_url: str = Form(...)):
         ydl_opts = get_ydl_opts()
         
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            print("获取视频信息...")
-            info = ydl.extract_info(video_url, download=False)
+            print("开始获取视频信息...")
+            try:
+                info = ydl.extract_info(video_url, download=False)
+                print(f"提取信息结果: {bool(info)}")
+            except Exception as e:
+                print(f"提取信息时出错: {str(e)}")
+                raise
+                
             if not info:
                 raise Exception("无法获取视频信息")
+            
+            print("成功获取视频信息，开始处理格式...")
             
             # 获取直接下载链接
             formats = info.get('formats', [])
